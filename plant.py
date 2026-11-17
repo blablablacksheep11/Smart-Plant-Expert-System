@@ -1,0 +1,98 @@
+
+from machine import ADC, Pin
+import time
+import dht
+import requests
+
+# Sensor initialization
+ldr = ADC(Pin(26))
+dht_sensor = dht.DHT22(Pin(15))
+soil_sensor = ADC(Pin(27))
+
+# Http configuration
+url = "http://localhost:8501"
+
+# Soil sensor calibration
+SOIL_DRY = 50000    # Replace with your dry soil ADC reading
+SOIL_WET = 33200    # Replace with your wet soil ADC reading
+
+# Sensor reading function
+def read_dht22():
+    try:
+        dht_sensor.measure()
+
+        temperature = dht_sensor.temperature()
+        humidity = dht_sensor.humidity()
+
+        return temperature, humidity
+
+    except OSError as e:
+        print("DHT22 Error:", e)
+        return None, None
+
+
+def read_ldr():
+    light_value = ldr.read_u16()
+
+    light_percentage = 100 - (light_value / 65535 * 100)
+
+    return light_value, light_percentage
+
+
+def read_soil():
+    soil_value = soil_sensor.read_u16()
+
+    # Convert ADC reading to voltage
+    soil_voltage = (soil_value / 65535) * 3.3
+
+    # Calculate soil moisture percentage
+    moisture_percentage = (
+        (SOIL_DRY - soil_value) /
+        (SOIL_DRY - SOIL_WET)
+    ) * 100
+
+    # Limit percentage between 0 and 100
+    moisture_percentage = max(0, min(100, moisture_percentage))
+
+    return soil_value, soil_voltage, moisture_percentage
+    
+# Main program
+def main():
+    while True:
+
+        # Read DHT22
+        temperature, humidity = read_dht22()
+
+        # Read LDR
+        light_value, light_percentage = read_ldr()
+
+        # Read Soil Moisture
+        soil_value, soil_voltage, soil_percentage = read_soil()
+
+        print("\n========== SENSOR READINGS ==========")
+
+        # DHT22
+        if temperature is not None:
+            print("\n--- DHT22 ---")
+            print("Temperature:", temperature, "°C")
+            print("Humidity:", humidity, "%")
+
+        # LDR
+        print("\n--- LDR ---")
+        print("ADC Value:", light_value)
+        print("Light Intensity:", round(light_percentage, 2), "%")
+
+        # Soil Moisture
+        
+        print("\n--- SOIL MOISTURE ---")
+        print("ADC Value:", soil_value)
+        print("Output Voltage:", round(soil_voltage, 2), "V")
+        print("Soil Moisture:", round(soil_percentage, 2), "%")
+        
+        response = requests.post(url, json={"temperature": temperature, "humidity": humidity, "light_intensity": light_percentage, "soil_moisture": soil_percentage}, timeout=10)
+
+        time.sleep(60)
+
+# Program entry point
+if __name__ == "__main__":
+    main()
