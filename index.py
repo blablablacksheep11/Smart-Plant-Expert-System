@@ -78,10 +78,10 @@ def live_environmental_updates():
 
         # Save latest readings to session_state so the inference engine can use them
         st.session_state.sensor_data = {
-            "temperature": response.data[0]["temperature"],
-            "humidity": response.data[0]["humidity"],
-            "light_intensity": response.data[0]["light_intensity"],
-            "soil_moisture": response.data[0]["soil_moisture"]
+            "temperature": round(response.data[0]["temperature"], 2),
+            "humidity": round(response.data[0]["humidity"], 2),
+            "light_intensity": round(response.data[0]["light_intensity"], 2),
+            "soil_moisture": round(response.data[0]["soil_moisture"], 2)
         }
 
     except requests.RequestException:

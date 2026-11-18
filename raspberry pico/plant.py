@@ -77,8 +77,8 @@ def main():
         # DHT22
         if temperature is not None:
             print("\n--- DHT22 ---")
-            print("Temperature:", temperature, "°C")
-            print("Humidity:", humidity, "%")
+            print("Temperature:", round(temperature, 2), "°C")
+            print("Humidity:", round(humidity, 2), "%")
 
         # LDR
         print("\n--- LDR ---")
@@ -97,7 +97,7 @@ def main():
         
         try:
             print("Sending http request...")
-            response = requests.post(url, json={"temperature": temperature, "humidity": humidity, "light_intensity": light_percentage, "soil_moisture": soil_percentage}, timeout=10)
+            response = requests.post(url, json={"temperature": round(temperature, 2), "humidity": round(humidity, 2), "light_intensity": round(light_percentage, 2), "soil_moisture": round(soil_percentage, 2)}, timeout=10)
             response.close()
             print("HTTP Response:", response.status_code, response.reason)
         except OSError as e:
