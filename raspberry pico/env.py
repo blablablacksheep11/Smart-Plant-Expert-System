@@ -1,0 +1,3 @@
+# Network connection
+WIFI_NAME = "WIFI_NAME"
+WIFI_PASSWORD = "WIFI_PASSWORD"

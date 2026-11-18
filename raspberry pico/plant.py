@@ -3,6 +3,9 @@ from machine import ADC, Pin
 import time
 import dht
 import requests
+import connection
+import env
+import gc
 
 # Sensor initialization
 ldr = ADC(Pin(26))
@@ -10,7 +13,7 @@ dht_sensor = dht.DHT22(Pin(15))
 soil_sensor = ADC(Pin(27))
 
 # Http configuration
-url = "http://localhost:8501"
+url = "http://IPv4_ADDRESS:5000/sensor-data"
 
 # Soil sensor calibration
 SOIL_DRY = 50000    # Replace with your dry soil ADC reading
@@ -89,10 +92,24 @@ def main():
         print("Output Voltage:", round(soil_voltage, 2), "V")
         print("Soil Moisture:", round(soil_percentage, 2), "%")
         
-        response = requests.post(url, json={"temperature": temperature, "humidity": humidity, "light_intensity": light_percentage, "soil_moisture": soil_percentage}, timeout=10)
+        gc.collect()
+        print()
+        
+        try:
+            print("Sending http request...")
+            response = requests.post(url, json={"temperature": temperature, "humidity": humidity, "light_intensity": light_percentage, "soil_moisture": soil_percentage}, timeout=10)
+            response.close()
+            print("HTTP Response:", response.status_code, response.reason)
+        except OSError as e:
+            print("HTTP Error:", e)
 
-        time.sleep(60)
+        finally:
+            gc.collect()
+
+             
+        time.sleep(20)
 
 # Program entry point
 if __name__ == "__main__":
     main()
+

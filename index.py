@@ -1,4 +1,7 @@
 import streamlit as st
+import requests
+import time
+from services.supabase import supabase
 
 st.markdown("""
 <style>
@@ -52,47 +55,62 @@ plant_type = None
 leaf_condition = None
 
 # -----------------------------------
-# Main dashboard
+# Live HTTP Polling Fragment
 # -----------------------------------
-with st.container(border=True):
-        
-    st.subheader("🌱 Plant Monitoring System")
-    st.divider()
-
-    # -----------------------------------
-    # Environmental Monitoring
-    # -----------------------------------
+@st.fragment(run_every="20s")
+def live_environmental_updates():
     st.write("**Environmental Monitoring**")
+
+    # Fetch live sensor data from your ESP32 / IoT HTTP endpoint
+    try:
+        with st.spinner("Fetching latest environmental data ...", show_time=True):
+            response = (
+                supabase.table("Environmental data")
+                .select("*")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+
+        if not response.data:
+            st.warning("No sensor data available.")
+            return
+
+        # Save latest readings to session_state so the inference engine can use them
+        st.session_state.sensor_data = {
+            "temperature": response.data[0]["temperature"],
+            "humidity": response.data[0]["humidity"],
+            "light_intensity": response.data[0]["light_intensity"],
+            "soil_moisture": response.data[0]["soil_moisture"]
+        }
+
+    except requests.RequestException:
+        st.caption("⚠️ Offline: Showing last known sensor readings.")
+
+    sensors = st.session_state.sensor_data
 
     # First row of metrics
     col1, col2 = st.columns(2)
-
     with col1:
-        st.metric(
-            label="🌡️ Temperature",
-            value=f"{temperature} °C"
-        )
-    
+        st.metric(label="🌡️ Temperature", value=f"{sensors['temperature']} °C")
     with col2:
-        st.metric(
-            label="💧 Humidity",
-            value=f"{humidity}%"
-        )
+        st.metric(label="💧 Humidity", value=f"{sensors['humidity']}%")
 
     # Second row of metrics
     col3, col4 = st.columns(2)
-
     with col3:
-        st.metric(
-            label="☀️ Light intensity",
-            value=f"{light_intensity}%"
-        )
-    
+        st.metric(label="☀️ Light intensity", value=f"{sensors['light_intensity']}%")
     with col4:
-        st.metric(
-            label="🌱 Soil moisture",
-            value=f"{soil_moisture}%"
-        )
+        st.metric(label="🌱 Soil moisture", value=f"{sensors['soil_moisture']}%")
+
+# -----------------------------------
+# Main dashboard
+# -----------------------------------
+with st.container(border=True):
+    st.subheader("🌱 Plant Monitoring System")
+    st.divider()
+
+    live_environmental_updates()
 
     st.divider()
 
@@ -146,10 +164,6 @@ with st.container(border=True):
 
         st.write(f"**Plant:** {plant_type}")
         st.write(f"**Leaf condition:** {leaf_condition}")
-
-        # This is where you will call your
-        # forward-chaining inference engine.
-        st.success("Recommendation generated successfully!")
 
         st.info(
             "Your expert system recommendation will appear here."
