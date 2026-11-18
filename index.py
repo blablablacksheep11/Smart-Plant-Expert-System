@@ -1,7 +1,8 @@
 import streamlit as st
 import requests
-import time
 from services.supabase import supabase
+from infer import derive_init_facts, infer
+from knowledge import rules
 
 st.markdown("""
 <style>
@@ -54,12 +55,54 @@ soil_moisture = 45
 plant_type = None
 leaf_condition = None
 
+if "sensor_data" not in st.session_state:
+    st.session_state.sensor_data = {
+        "temperature": 0,
+        "humidity": 0,
+        "light_intensity": 0,
+        "soil_moisture": 0
+    }
+
+if "previous_facts" not in st.session_state:
+    st.session_state.previous_facts = None
+
+recommendation_messages = {
+    "recommend_plant_conditions_healthy": {
+        "message": "Your plant conditions are healthy. Continue maintaining the current environmental conditions.",
+        "status": "success"
+    },
+
+    "recommend_fertilization": {
+        "message": "Your plant may require additional nutrients. Consider applying suitable fertilizer.",
+        "status": "warning"
+    },
+
+    "recommend_environment_adjustment": {
+        "message": "Your plant is experiencing environmental stress. Adjust the surrounding temperature and monitor soil moisture.",
+        "status": "warning"
+    },
+
+    "recommend_improve_ventilation_and_pest_control": {
+        "message": "Improve air circulation around your plant and inspect it for possible fungal infections or pests.",
+        "status": "warning"
+    },
+
+    "recommend_watering_and_shade": {
+        "message": "Your plant may need additional water. Move it to a partially shaded area to reduce excessive sunlight and heat.",
+        "status": "warning"
+    }
+}
+
 # -----------------------------------
 # Live HTTP Polling Fragment
 # -----------------------------------
 @st.fragment(run_every="20s")
 def live_environmental_updates():
-    st.write("**Environmental Monitoring**")
+    column1, column2 = st.columns([8, 2])
+    with column1:
+        st.write("**Environmental Monitoring**")
+    with column2:
+        st.button("Refresh", type="tertiary", key="refresh_environmental_data")
 
     # Fetch live sensor data from your ESP32 / IoT HTTP endpoint
     try:
@@ -125,11 +168,8 @@ with st.container(border=True):
         "**Plant type**",
         options=[
             "Rose",
-            "Sunflower",
-            "Tomato",
             "Chilli",
-            "Mint",
-            "Other"
+            "Cactus",
         ],
         index=None,
         placeholder="Select plant"
@@ -159,12 +199,48 @@ with st.container(border=True):
     if generate:
 
         st.divider()
+        st.subheader("📋 Plant Assessment Result")
 
-        st.markdown("### Plant Assessment Result")
-
-        st.write(f"**Plant:** {plant_type}")
-        st.write(f"**Leaf condition:** {leaf_condition}")
-
-        st.info(
-            "Your expert system recommendation will appear here."
+        # Derive initial facts based on sensor readings and previous facts 
+        facts = derive_init_facts(
+            soil_moisture=st.session_state.sensor_data["soil_moisture"],
+            temperature=st.session_state.sensor_data["temperature"],
+            humidity=st.session_state.sensor_data["humidity"],
+            light_intensity=st.session_state.sensor_data["light_intensity"],
+            previous_facts=st.session_state.previous_facts
         )
+
+        st.session_state.previous_facts = facts
+
+        facts.add(f"plant_type_{plant_type.lower()}")
+        facts.add(f"leaf_condition_{leaf_condition.lower()}")     
+
+        st.write("**Recommendation:**")
+
+        recommendations, fired_rules = infer(rules, facts)
+        if recommendations:
+            for recommendation in sorted(recommendations):
+                details = recommendation_messages.get(
+                    recommendation,
+                    "No recommendation available."
+                )
+
+                message = details["message"]
+                status = details["status"]
+
+                if status == "success":
+                    st.success(message)
+
+                elif status == "warning":
+                    st.warning(message)
+
+        else:
+            st.write("No specific recommendations at this time.")
+        
+        
+        st.write("**Rules fired:**")
+        with st.popover("View reasoning"):
+            for rule in fired_rules:
+                st.write(rule["name"])
+
+        
