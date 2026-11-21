@@ -121,10 +121,13 @@ def matching_rules(rules, facts):
 
 
 def select_rule(agenda):
-
     return sorted(
         agenda,
-        key=lambda rule: (-rule["priority"], rule["name"])
+        key=lambda rule: (
+            -len(rule["conditions"]),
+            -rule["priority"],
+            rule["name"]
+        )
     )[0]
 
 def infer(rules, initial_facts):
